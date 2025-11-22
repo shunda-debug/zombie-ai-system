@@ -1,42 +1,18 @@
 import streamlit as st
 import time
+import re # 正規表現を使うために必要
 from google import genai
 
 # --- 1. ページ設定 & デザイン注入 ---
 st.set_page_config(page_title="Sci-Core AI", page_icon="⚛️", layout="wide")
 
-# カスタムCSS（見た目を洗練させる魔法）
 st.markdown("""
 <style>
-    /* 全体の背景とフォント */
-    .stApp {
-        background-color: #0E1117;
-        color: #FAFAFA;
-    }
-    /* チャットの見た目 */
-    .stChatMessage {
-        background-color: #161B22;
-        border: 1px solid #30363D;
-        border-radius: 10px;
-        padding: 15px;
-    }
-    /* 数式（LaTeX）を大きく綺麗に */
-    .katex {
-        font-size: 1.2em !important;
-        color: #58A6FF !important;
-    }
-    /* サイドバー */
-    [data-testid="stSidebar"] {
-        background-color: #010409;
-        border-right: 1px solid #30363D;
-    }
-    /* ボタン */
-    .stButton button {
-        background-color: #238636;
-        color: white;
-        border-radius: 5px;
-        font-weight: bold;
-    }
+    .stApp { background-color: #0E1117; color: #FAFAFA; }
+    .stChatMessage { background-color: #161B22; border: 1px solid #30363D; border-radius: 10px; padding: 15px; }
+    .katex { font-size: 1.2em !important; color: #58A6FF !important; }
+    [data-testid="stSidebar"] { background-color: #010409; border-right: 1px solid #30363D; }
+    .stButton button { background-color: #238636; color: white; border-radius: 5px; font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -49,33 +25,32 @@ except:
 
 client = genai.Client(api_key=api_key)
 
-# --- 2. 理系特化の脳みそ（プロンプト） ---
+# --- 2. 理系特化の脳みそ（修正版） ---
 def call_science_model(client, prompt, role="solver"):
     try:
         if role == "solver":
-            # 計算ミスを防ぎ、数式をきれいにする命令
+            # ▼▼▼ ここを修正しました（align環境の禁止） ▼▼▼
             sys_instruction = """
             あなたは世界最高峰の科学技術計算AIです。
-            ユーザーの質問に対し、以下のルールを絶対厳守してください。
-
-            【ルール1：数式の美化】
-            - 出力の数式はすべてLaTeX形式（$記号）で記述せよ。
-            - 分数は `a/b` ではなく `\\frac{a}{b}` を使え。
-            - 乗数は `^2` ではなく `^2` (上付き文字)としてレンダリングされるよう書け。
-            - 積分やシグマも見やすく整形せよ。
-
-            【ルール2：計算プロセスの厳格化】
-            - 暗算は禁止する。複雑な計算はステップごとに分解せよ。
-            - 単位（SI単位系）の変換に注意せよ。
-            - 最終的な答えを出す前に、自分の計算が論理的に正しいか再確認せよ。
+            
+            【重要：数式表示ルール】
+            Streamlitで表示するため、以下のルールを厳守せよ：
+            1. 数式は必ず `$$` で囲むこと。（例: $$ x^2 $$）
+            2. `\\begin{align}` や `\\begin{equation}` などの環境定義は**絶対に使用しないこと**。
+            3. 複数行の数式を書きたい場合は、`$$` のブロックを分けて書くこと。
+            
+            【計算ルール】
+            - 暗算禁止。途中式を丁寧に書く。
+            - 単位を正確に記述する。
             """
-        else: # Judge (Reviewer)
+        else: # Judge
             sys_instruction = """
             あなたは厳格な数学査読者です。
-            3つのAIの回答を比較し、以下の基準で最終回答を作成してください。
-            1. 「計算結果」が一致しているか確認する。一致しない場合は再計算し、正しい方を採用する。
-            2. 最も「数式が見やすく（LaTeX）」、「解説が丁寧」なものをベースにする。
-            3. ユーザーへの回答は、教科書のように美しく整形された数式で出力する。
+            3つの回答を比較し、最も正確で分かりやすい最終回答を作成してください。
+            
+            【表示ルール】
+            - `\\begin{align}` は使用禁止。
+            - すべての数式は `$$` または `$` で囲むこと。
             """
         
         res = client.models.generate_content(
@@ -90,20 +65,17 @@ def call_science_model(client, prompt, role="solver"):
 # --- サイドバー ---
 with st.sidebar:
     st.title("⚛️ Sci-Core AI")
-    st.caption("v2.0 Professional Design")
+    st.caption("v2.1 Display Fixed")
     
-    st.markdown("### 📊 Status")
     col1, col2, col3 = st.columns(3)
     col1.metric("Solver A", "ON")
     col2.metric("Solver B", "ON")
     col3.metric("Solver C", "ON")
     
     st.markdown("---")
-    if st.button("🗑️ 黒板を消す（リセット）", use_container_width=True):
+    if st.button("🗑️ 黒板を消す", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
-
-    st.info("💡 ヒント: `x^2` や `sqrt(x)` と入力しても、AIは綺麗な数式 `$\\sqrt{x}$` に変換して返します。")
 
 # --- メイン画面 ---
 st.title("⚛️ Sci-Core Solver")
@@ -145,13 +117,13 @@ if question:
         status.info("👨‍⚖️ 査読者が数式を整形・検算中...")
         
         log_text = f"""
-        **Solver A Output:**
+        **Solver A:**
         {ans_a}
         
-        **Solver B Output:**
+        **Solver B:**
         {ans_b}
         
-        **Solver C Output:**
+        **Solver C:**
         {ans_c}
         """
 
@@ -162,14 +134,15 @@ if question:
         【解法B】{ans_b}
         【解法C】{ans_c}
         
-        上記を統合し、正しい計算結果と最も美しい数式表現を用いて回答してください。
+        上記を統合し、正しい計算結果を回答してください。
+        数式は必ず `$$` で囲み、align環境は使わないでください。
         """
         
         final_answer = call_science_model(client, judge_prompt, "judge")
         
         if final_answer:
             status.empty()
-            st.markdown(final_answer) # ここでLaTeXが綺麗に表示されます
+            st.markdown(final_answer)
             st.session_state.messages.append({
                 "role": "assistant", 
                 "content": final_answer, 
