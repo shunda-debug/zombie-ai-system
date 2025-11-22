@@ -5,7 +5,7 @@ import time
 from google import genai
 
 # --- ページ設定 ---
-st.set_page_config(page_title="Zombie AI", page_icon="🧟", layout="wide")
+st.set_page_config(page_title="Zombie AI Enterprise", page_icon="🛡️", layout="wide")
 
 # --- APIキー ---
 try:
@@ -17,8 +17,7 @@ except:
 client = genai.Client(api_key=api_key)
 
 # --- 関数 ---
-def call_ai_robust(client, model, prompt, retries=2):
-    # Proモデルの時はリトライ回数を減らす（待たせすぎないため）
+def call_ai_robust(client, model, prompt, retries=3):
     for i in range(retries):
         try:
             res = client.models.generate_content(model=model, contents=prompt)
@@ -36,37 +35,29 @@ def get_integer(text):
 
 # --- サイドバー ---
 with st.sidebar:
-    st.title("🧟 Zombie AI")
-    st.caption("v3.5 Honest Architecture")
-    if st.button("🗑️ 会話をリセット", use_container_width=True):
+    st.title("🛡️ Zombie AI")
+    st.caption("v4.0 Strict Enterprise")
+    
+    st.markdown("---")
+    st.warning("⚠️ Strict Mode: Active")
+    st.caption("不確実な情報は一切排除されます。")
+    
+    if st.button("🗑️ リセット", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
 
 # --- メイン画面 ---
-st.title("💬 Zombie AI Chat")
-st.caption("信頼性第一。判定不能な場合は正直に両論を表示します。")
+st.title("🛡️ Zombie AI System")
+st.caption("「推測」ではなく「確実性」のみを提供する産業用モデル。")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# 履歴表示
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
-        # もし「喧嘩両成敗モード」のログなら、左右に分けて表示
-        if message.get("type") == "split":
-            st.warning("⚠️ Proモデル応答なしのため、両論を併記します")
-            col1, col2 = st.columns(2)
-            with col1:
-                st.info("🤖 Flash Aの意見")
-                st.markdown(message["content_a"])
-            with col2:
-                st.info("🤖 Flash Cの意見")
-                st.markdown(message["content_c"])
-        else:
-            st.markdown(message["content"])
-        
+        st.markdown(message["content"])
         if "details" in message:
-            with st.expander("🔍 思考ログ"):
+            with st.expander("🔍 監査ログ"):
                 st.markdown(message["details"])
 
 question = st.chat_input("質問を入力...")
@@ -78,14 +69,14 @@ if question:
 
     with st.chat_message("assistant"):
         status = st.empty()
-        status.info("⚡ 思考中... (Flash並列計算)")
+        status.info("⚡ Tier 1: Flashモデルによる並列監査中...")
         
         # 1. Flash実行
         res_a = call_ai_robust(client, "gemini-2.0-flash", f"{question} (簡潔に)")
         res_c = call_ai_robust(client, "gemini-2.0-flash", f"{question} (簡潔に)")
         
-        text_a = res_a if res_a else "エラー"
-        text_c = res_c if res_c else "エラー"
+        text_a = res_a if res_a else "Error"
+        text_c = res_c if res_c else "Error"
         
         match = False
         final_answer = ""
@@ -98,49 +89,45 @@ if question:
             if (num_a and num_c and num_a == num_c) or (res_a == res_c):
                 match = True
                 final_answer = res_a
-                log_text += "✅ **判定:** 一致 (Tier 1採用)"
+                log_text += "✅ **Audit Passed:** 意見一致 (Tier 1採用)"
         
         # 3. 分岐
         if match:
-            # 一致ならそのまま表示
             status.empty()
+            st.success("✅ 承認されました")
             st.markdown(final_answer)
             st.session_state.messages.append({"role": "assistant", "content": final_answer, "details": log_text})
         
         else:
-            status.warning("🚨 意見不一致。Proモデルを呼び出し中...")
-            log_text += "🚨 **判定:** 不一致 -> Proモデル起動\n\n"
+            status.warning("🚨 意見不一致を検知。最高権限(Pro)による裁定を要求中...")
+            log_text += "🚨 **Alert:** 不一致検知 -> Proモデル承認待ち\n\n"
             
+            # Pro呼び出し
             res_pro = call_ai_robust(client, "gemini-2.0-pro-exp-02-05", f"{question} (専門家として厳密に)")
             
             status.empty()
             
             if res_pro:
                 # Pro成功
+                st.success("🏆 最高権限による承認完了")
                 st.markdown(res_pro)
-                log_text += f"**🏆 Pro Answer:** {res_pro}"
+                log_text += f"**🏆 Pro Decision:** {res_pro}"
                 st.session_state.messages.append({"role": "assistant", "content": res_pro, "details": log_text})
             
             else:
-                # 💀 Pro失敗 -> 正直に「左右分割」で表示！
-                st.warning("⚠️ Proモデルが混雑しているため、判定を保留しました。")
+                # 💀 Pro失敗 -> ここが企業向けポイント
+                # 適当な答えを出さず、システムをロックする
+                error_message = """
+                ⛔ **SYSTEM HALTED: 信頼性担保不能**
                 
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.info("🤖 Flash Aの意見")
-                    st.markdown(text_a)
-                with col2:
-                    st.info("🤖 Flash Cの意見")
-                    st.markdown(text_c)
+                Tier 1での意見不一致に対し、Tier 2(Pro)による裁定を試みましたが、
+                API応答制限により確実な検証ができませんでした。
                 
-                log_text += "💀 **Pro Status:** 応答なし\n🛡️ **Fallback:** 両論併記モード"
+                本システムは「不確実な回答」によるリスクを回避するため、
+                回答出力を拒否しました。しばらく待って再試行してください。
+                """
                 
-                # 履歴には「特殊な形式」で保存する
-                st.session_state.messages.append({
-                    "role": "assistant",
-                    "type": "split", # ここが目印
-                    "content_a": text_a,
-                    "content_c": text_c,
-                    "content": "（両論併記を表示中）", # ログ用テキスト
-                    "details": log_text
-                })
+                st.error(error_message)
+                log_text += "⛔ **CRITICAL:** 監査プロセス未完了のため出力拒否"
+                
+                st.session_state.messages.append({"role": "assistant", "content": error_message, "details": log_text})
