@@ -3,24 +3,37 @@ import time
 from google import genai
 
 # --- ページ設定 ---
-st.set_page_config(page_title="Zombie AI Quad", page_icon="⚖️", layout="wide")
+st.set_page_config(page_title="Sci-Core AI", page_icon="⚛️", layout="wide")
 
-# --- APIキー読み込み ---
+# --- APIキー ---
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
 except:
-    st.error("🚨 エラー: SecretsにAPIキーを設定してください。")
+    st.error("🚨 エラー: APIキーの設定が必要です")
     st.stop()
 
 client = genai.Client(api_key=api_key)
 
-# --- 関数: 頑丈なAI呼び出し ---
-def call_flash(client, prompt, role="analysis"):
+# --- 関数 ---
+def call_science_model(client, prompt, role="solver"):
     try:
-        # 役割に応じてシステムプロンプトを変える
-        sys_instruction = "あなたは簡潔に事実のみを答えるAIです。"
-        if role == "judge":
-            sys_instruction = "あなたは公平な裁判官です。提示された複数の回答を比較し、最も正確で論理的な最終回答を作成してください。"
+        # 理系特化のシステムプロンプト
+        if role == "solver":
+            sys_instruction = """
+            あなたは世界最高峰の物理学者かつ数学者です。
+            ユーザーの質問に対し、以下のルールを厳守して回答してください：
+            1. いきなり答えを出さず、必ず「思考プロセス（途中式）」を示すこと。
+            2. 数式はLaTeX形式（$記号で囲む）を使ってきれいに書くこと。
+            3. 単位（km/s, J, Nなど）を正確に扱うこと。
+            4. 曖昧な知識で答えず、論理的に導き出すこと。
+            """
+        else: # Judge
+            sys_instruction = """
+            あなたは厳格な査読者（Reviewer）です。
+            3つのAIが導き出した「計算過程」と「答え」を比較し、
+            最も論理的で、計算ミスがないものを採用して最終回答を作成してください。
+            もし意見が割れている場合は、多数決ではなく「論理の正しさ」で判断してください。
+            """
         
         res = client.models.generate_content(
             model="gemini-2.0-flash", 
@@ -33,21 +46,32 @@ def call_flash(client, prompt, role="analysis"):
 
 # --- サイドバー ---
 with st.sidebar:
-    st.title("⚖️ Zombie AI")
-    st.caption("v5.0 Quad-Core Architecture")
+    st.title("⚛️ Sci-Core AI")
+    st.caption("v1.0 Science Solver")
     
-    st.info("🟢 Worker A: Online")
-    st.info("🟢 Worker B: Online")
-    st.info("🟢 Worker C: Online")
-    st.success("👨‍⚖️ Judge: Active")
+    st.info("🟢 Solver A (Physics): Ready")
+    st.info("🟢 Solver B (Math): Ready")
+    st.info("🟢 Solver C (Logic): Ready")
+    st.success("👨‍⚖️ Reviewer: Active")
     
-    if st.button("🗑️ リセット", use_container_width=True):
+    if st.button("🗑️ 計算用紙を捨てる", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
+    
+    st.markdown("---")
+    st.markdown(
+        """
+        ### 🎓 For Students
+        普通のAIは計算を間違えますが、
+        このAIは3つの頭脳で検算するため
+        **計算ミスを極限まで減らします。**
+        宿題の検算やレポート作成に。
+        """
+    )
 
 # --- メイン画面 ---
-st.title("⚖️ Zombie AI System")
-st.caption("3台の実行部隊と1台の裁判官による、プロ不要の完全合議システム。")
+st.title("⚛️ 理系専用・高精度AIソルバー")
+st.caption("数学・物理・化学の難問を、3段階のクロスチェックで解き明かします。")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -57,11 +81,11 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
         if "details" in message:
-            with st.expander("🔍 3者の意見と裁判記録を見る"):
+            with st.expander("🔍 検算ログを見る"):
                 st.markdown(message["details"])
 
 # 質問入力
-question = st.chat_input("質問を入力...")
+question = st.chat_input("数式、物理の問題などを入力...")
 
 if question:
     with st.chat_message("user"):
@@ -70,75 +94,69 @@ if question:
 
     with st.chat_message("assistant"):
         status = st.empty()
-        status.info("⚡ 3台のFlashモデルが並列調査中...")
+        status.info("⚡ 3つのAIが別ルートで計算中...")
         
-        # 1. 3台のワーカーが一斉に回答を作成
-        # (Streamlitは基本直列ですが、Flashは高速なのでユーザーには一瞬に見えます)
-        res_a = call_flash(client, question, "analysis")
-        res_b = call_flash(client, question, "analysis")
-        res_c = call_flash(client, question, "analysis")
+        # 1. 3台のソルバーが計算
+        res_a = call_science_model(client, question, "solver")
+        res_b = call_science_model(client, question, "solver")
+        res_c = call_science_model(client, question, "solver")
         
-        # エラーハンドリング（万が一失敗したらエラー表示）
-        ans_a = res_a if res_a else "回答不能"
-        ans_b = res_b if res_b else "回答不能"
-        ans_c = res_c if res_c else "回答不能"
+        ans_a = res_a if res_a else "計算不能"
+        ans_b = res_b if res_b else "計算不能"
+        ans_c = res_c if res_c else "計算不能"
         
-        # 2. 画面に3人の意見を表示（透明性）
-        status.info("👨‍⚖️ 裁判官(Judge)が3つの意見を審議中...")
+        # 2. 査読中
+        status.info("👨‍⚖️ 査読者(Reviewer)が途中式を検証中...")
         
-        # ログ用テキスト作成
         log_text = f"""
-        | Model | Answer Summary |
+        | Model | Result Preview |
         | :--- | :--- |
-        | **Worker A** | {ans_a[:50]}... |
-        | **Worker B** | {ans_b[:50]}... |
-        | **Worker C** | {ans_c[:50]}... |
+        | **Solver A** | {ans_a[:30]}... |
+        | **Solver B** | {ans_b[:30]}... |
+        | **Solver C** | {ans_c[:30]}... |
         
         ---
-        **詳細な回答:**
+        **検証用全データ:**
         
-        **🤖 Flash A:**
+        **⚛️ Solver A:**
         {ans_a}
         
-        **🤖 Flash B:**
+        **⚛️ Solver B:**
         {ans_b}
         
-        **🤖 Flash C:**
+        **⚛️ Solver C:**
         {ans_c}
         """
 
-        # 3. 裁判官による最終決定 (Judge Step)
+        # 3. 査読者による最終回答
         judge_prompt = f"""
-        【ユーザーの質問】
+        【問題】
         {question}
 
-        【AI-Aの回答】
+        【解法A】
         {ans_a}
 
-        【AI-Bの回答】
+        【解法B】
         {ans_b}
 
-        【AI-Cの回答】
+        【解法C】
         {ans_c}
 
-        【あなたの仕事】
-        あなたは最高裁判官です。上記3つの回答を比較し、
-        最も正確で、矛盾がなく、信頼できる「最終回答」を作成してください。
-        もし3つの意見が食い違っている場合は、多数決の論理を用いて正解を導き出してください。
-        回答は、ユーザーに対する返答のみを出力してください。
+        あなたは査読者です。3つの解法を比較し、
+        最も「途中式が丁寧」で「答えが正確」なものをベースに、
+        ユーザーへの最終回答（解説付き）を作成してください。
+        数式はLaTeXで書いてください。
         """
         
-        final_answer = call_flash(client, judge_prompt, "judge")
+        final_answer = call_science_model(client, judge_prompt, "judge")
         
         if final_answer:
             status.empty()
             st.markdown(final_answer)
-            
-            # ログに裁判官のコメントを追加
             st.session_state.messages.append({
                 "role": "assistant", 
                 "content": final_answer, 
                 "details": log_text
             })
         else:
-            status.error("💀 裁判官が倒れました（システムエラー）")
+            status.error("💀 計算処理に失敗しました")
