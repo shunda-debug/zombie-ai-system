@@ -3,7 +3,7 @@ import time
 import re
 from google import genai
 
-# --- 1. ページ設定 & デザイン注入（スマホ対応版） ---
+# --- 1. ページ設定 & デザイン注入（スマホ完全対応版） ---
 st.set_page_config(page_title="Sci-Core AI", page_icon="⚛️", layout="wide")
 
 st.markdown("""
@@ -11,14 +11,25 @@ st.markdown("""
     /* 全体の背景と基本フォント設定 */
     .stApp {
         background-color: #0E1117;
-        color: #FFFFFF !important; /* 強制的に真っ白に */
+        color: #FFFFFF !important;
     }
     
-    /* 文字を全体的にくっきりさせる（スマホ対策） */
+    /* スマホ対策: 入力欄の色を強制的にダークにする */
+    .stChatInput textarea {
+        background-color: #161B22 !important; /* 背景を濃いグレーに */
+        color: #FFFFFF !important; /* 文字を白に */
+        caret-color: #FFFFFF !important; /* カーソルも白に */
+    }
+    /* 入力欄のコンテナ自体も黒く */
+    div[data-testid="stChatInput"] {
+        background-color: #0E1117 !important;
+    }
+
+    /* 文字を全体的にくっきりさせる */
     body, p, div, span, label, h1, h2, h3, h4, h5, h6 {
         color: #FFFFFF !important;
-        font-weight: 500 !important; /* 少し太くして視認性アップ */
-        -webkit-font-smoothing: antialiased; /* iPhoneで文字を滑らかに */
+        font-weight: 500 !important;
+        -webkit-font-smoothing: antialiased;
     }
 
     /* チャットメッセージの箱 */
@@ -29,17 +40,10 @@ st.markdown("""
         padding: 15px;
     }
 
-    /* ユーザーの入力欄（ここが薄くなりがち） */
-    .stChatInput textarea {
-        color: #FFFFFF !important;
-        caret-color: #FFFFFF !important; /* カーソルも白く */
-        font-weight: bold !important;
-    }
-
     /* 数式（LaTeX）の設定 */
     .katex {
-        font-size: 1.3em !important; /* スマホで見やすいよう少し大きく */
-        color: #58A6FF !important; /* 青白く光らせる */
+        font-size: 1.3em !important;
+        color: #58A6FF !important;
     }
 
     /* サイドバー */
@@ -48,11 +52,6 @@ st.markdown("""
         border-right: 1px solid #30363D;
     }
     
-    /* エラーメッセージなどを目立たせる */
-    .stAlert {
-        font-weight: bold;
-    }
-
     /* ボタン */
     .stButton button {
         background-color: #238636;
@@ -73,32 +72,27 @@ except:
 
 client = genai.Client(api_key=api_key)
 
-# --- 2. 理系特化の脳みそ ---
+# --- 2. 履歴管理システム ---
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = [] # 過去のセッションを保存するリスト
+
+if "messages" not in st.session_state:
+    st.session_state.messages = [] # 現在の会話
+
+# --- 3. 理系特化の脳みそ ---
 def call_science_model(client, prompt, role="solver"):
     try:
         if role == "solver":
             sys_instruction = """
             あなたは世界最高峰の科学技術計算AIです。
-            
-            【重要：数式表示ルール】
-            Streamlitで表示するため、以下のルールを厳守せよ：
-            1. 数式は必ず `$$` で囲むこと。（例: $$ x^2 $$）
-            2. `\\begin{align}` や `\\begin{equation}` などの環境定義は絶対に使用しないこと。
-            3. 複数行の数式は `$$` ブロックを分けて記述すること。
-            
-            【計算ルール】
-            - 暗算禁止。途中式を丁寧に書く。
-            - 単位を正確に記述する。
+            数式は必ず `$$` で囲み、`\\begin{align}` は使用しないでください。
+            暗算禁止。途中式を丁寧に書き、単位を正確に記述してください。
             """
         else: # Judge
             sys_instruction = """
             あなたは厳格な数学査読者です。
             3つの回答を比較し、最も正確で分かりやすい最終回答を作成してください。
-            
-            【表示ルール】
-            - `\\begin{align}` は使用禁止。
-            - すべての数式は `$$` または `$` で囲むこと。
-            - 文字や数字は省略せず、丁寧に書くこと。
+            `\\begin{align}` は使用禁止。すべての数式は `$$` または `$` で囲んでください。
             """
         
         res = client.models.generate_content(
@@ -113,26 +107,43 @@ def call_science_model(client, prompt, role="solver"):
 # --- サイドバー ---
 with st.sidebar:
     st.title("⚛️ Sci-Core AI")
-    st.caption("v2.2 Mobile Optimized")
+    st.caption("v2.3 History & Mobile")
     
+    # ステータス表示
     col1, col2, col3 = st.columns(3)
-    col1.metric("Solver A", "ON")
-    col2.metric("Solver B", "ON")
-    col3.metric("Solver C", "ON")
+    col1.metric("A", "🟢")
+    col2.metric("B", "🟢")
+    col3.metric("C", "🟢")
     
     st.markdown("---")
-    if st.button("🗑️ 黒板を消す", use_container_width=True):
+    
+    # 🆕 新しい会話ボタン（履歴に保存してからリセット）
+    if st.button("➕ 新しい会話を始める", use_container_width=True):
+        if st.session_state.messages:
+            # 現在の会話を履歴リストに保存
+            summary = st.session_state.messages[0]["content"][:20] + "..." if st.session_state.messages else "No Data"
+            st.session_state.chat_history.append({"title": summary, "log": st.session_state.messages})
+        # 現在の会話をクリア
         st.session_state.messages = []
         st.rerun()
+
+    st.markdown("### 📚 過去の会話履歴")
+    if not st.session_state.chat_history:
+        st.caption("履歴はありません")
+    else:
+        # 過去の会話をアコーディオンで表示
+        for i, chat in enumerate(reversed(st.session_state.chat_history)):
+            with st.expander(f"📝 {chat['title']}"):
+                for msg in chat["log"]:
+                    st.text(f"{msg['role']}: {msg['content']}")
+
+    st.info("💡 スマホの方は、左上の「>」または「≡」を押すとこのメニューが開きます。")
 
 # --- メイン画面 ---
 st.title("⚛️ Sci-Core Solver")
 st.markdown("#### 究極の計算精度と、美しい数式表示。")
 
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-# 履歴表示
+# 現在の履歴表示
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
@@ -165,14 +176,9 @@ if question:
         status.info("👨‍⚖️ 査読者が数式を整形・検算中...")
         
         log_text = f"""
-        **Solver A:**
-        {ans_a}
-        
-        **Solver B:**
-        {ans_b}
-        
-        **Solver C:**
-        {ans_c}
+        **Solver A:** {ans_a}
+        **Solver B:** {ans_b}
+        **Solver C:** {ans_c}
         """
 
         # 3. 最終回答生成
