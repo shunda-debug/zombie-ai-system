@@ -1,18 +1,66 @@
 import streamlit as st
 import time
-import re # 正規表現を使うために必要
+import re
 from google import genai
 
-# --- 1. ページ設定 & デザイン注入 ---
+# --- 1. ページ設定 & デザイン注入（スマホ対応版） ---
 st.set_page_config(page_title="Sci-Core AI", page_icon="⚛️", layout="wide")
 
 st.markdown("""
 <style>
-    .stApp { background-color: #0E1117; color: #FAFAFA; }
-    .stChatMessage { background-color: #161B22; border: 1px solid #30363D; border-radius: 10px; padding: 15px; }
-    .katex { font-size: 1.2em !important; color: #58A6FF !important; }
-    [data-testid="stSidebar"] { background-color: #010409; border-right: 1px solid #30363D; }
-    .stButton button { background-color: #238636; color: white; border-radius: 5px; font-weight: bold; }
+    /* 全体の背景と基本フォント設定 */
+    .stApp {
+        background-color: #0E1117;
+        color: #FFFFFF !important; /* 強制的に真っ白に */
+    }
+    
+    /* 文字を全体的にくっきりさせる（スマホ対策） */
+    body, p, div, span, label, h1, h2, h3, h4, h5, h6 {
+        color: #FFFFFF !important;
+        font-weight: 500 !important; /* 少し太くして視認性アップ */
+        -webkit-font-smoothing: antialiased; /* iPhoneで文字を滑らかに */
+    }
+
+    /* チャットメッセージの箱 */
+    .stChatMessage {
+        background-color: #161B22;
+        border: 1px solid #30363D;
+        border-radius: 10px;
+        padding: 15px;
+    }
+
+    /* ユーザーの入力欄（ここが薄くなりがち） */
+    .stChatInput textarea {
+        color: #FFFFFF !important;
+        caret-color: #FFFFFF !important; /* カーソルも白く */
+        font-weight: bold !important;
+    }
+
+    /* 数式（LaTeX）の設定 */
+    .katex {
+        font-size: 1.3em !important; /* スマホで見やすいよう少し大きく */
+        color: #58A6FF !important; /* 青白く光らせる */
+    }
+
+    /* サイドバー */
+    [data-testid="stSidebar"] {
+        background-color: #010409;
+        border-right: 1px solid #30363D;
+    }
+    
+    /* エラーメッセージなどを目立たせる */
+    .stAlert {
+        font-weight: bold;
+    }
+
+    /* ボタン */
+    .stButton button {
+        background-color: #238636;
+        color: white !important;
+        border-radius: 5px;
+        font-weight: bold;
+        border: none;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -25,19 +73,18 @@ except:
 
 client = genai.Client(api_key=api_key)
 
-# --- 2. 理系特化の脳みそ（修正版） ---
+# --- 2. 理系特化の脳みそ ---
 def call_science_model(client, prompt, role="solver"):
     try:
         if role == "solver":
-            # ▼▼▼ ここを修正しました（align環境の禁止） ▼▼▼
             sys_instruction = """
             あなたは世界最高峰の科学技術計算AIです。
             
             【重要：数式表示ルール】
             Streamlitで表示するため、以下のルールを厳守せよ：
             1. 数式は必ず `$$` で囲むこと。（例: $$ x^2 $$）
-            2. `\\begin{align}` や `\\begin{equation}` などの環境定義は**絶対に使用しないこと**。
-            3. 複数行の数式を書きたい場合は、`$$` のブロックを分けて書くこと。
+            2. `\\begin{align}` や `\\begin{equation}` などの環境定義は絶対に使用しないこと。
+            3. 複数行の数式は `$$` ブロックを分けて記述すること。
             
             【計算ルール】
             - 暗算禁止。途中式を丁寧に書く。
@@ -51,6 +98,7 @@ def call_science_model(client, prompt, role="solver"):
             【表示ルール】
             - `\\begin{align}` は使用禁止。
             - すべての数式は `$$` または `$` で囲むこと。
+            - 文字や数字は省略せず、丁寧に書くこと。
             """
         
         res = client.models.generate_content(
@@ -65,7 +113,7 @@ def call_science_model(client, prompt, role="solver"):
 # --- サイドバー ---
 with st.sidebar:
     st.title("⚛️ Sci-Core AI")
-    st.caption("v2.1 Display Fixed")
+    st.caption("v2.2 Mobile Optimized")
     
     col1, col2, col3 = st.columns(3)
     col1.metric("Solver A", "ON")
