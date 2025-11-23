@@ -91,7 +91,7 @@ with st.sidebar:
         st.rerun()
 
 # --- メイン画面 ---
-st.title("👁️ Sci-Core Lens")
+st.title("👁️ Sci-Core v1.0")
 st.markdown("#### 画像解析 × 超高精度計算")
 
 # 履歴表示
