@@ -31,7 +31,7 @@ st.markdown("""
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
 except:
-    st.error("🚨 エラー: APIキー設定が必要です")
+    st.error(" エラー: APIキー設定が必要です")
     st.stop()
 
 client = genai.Client(api_key=api_key)
@@ -92,7 +92,7 @@ with st.sidebar:
 
 # --- メイン画面 ---
 st.title("👁️ Sci-Core v1.0")
-st.markdown("#### 画像解析 × 超高精度計算")
+st.markdown("#### 画像解析 × 高精度計算")
 
 # 履歴表示
 for message in st.session_state.messages:
