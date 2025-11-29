@@ -95,16 +95,16 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### 🖥️ System Status")
     col1, col2, col3 = st.columns(3)
-    col1.metric("A", "🟢")
-    col2.metric("B", "🟢")
-    col3.metric("C", "🟢")
+    col1.metric("A", "on-line")
+    col2.metric("B", "on-line")
+    col3.metric("C", "on-line")
     
     if st.button("🗑️ 履歴を消去"):
         st.session_state.messages = []
         st.rerun()
 
 # --- メインチャット画面 ---
-st.title("👁️ Sci-Core v1.1")
+st.title("zombie-AI v1.1")
 
 # チャット履歴の表示
 for message in st.session_state.messages:
