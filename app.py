@@ -9,11 +9,11 @@ st.set_page_config(page_title="Sci-Core AI", page_icon="⚛️", layout="wide")
 # --- 2. テーマ管理とCSS ---
 # サイドバーでテーマ切り替え
 with st.sidebar:
-    st.title("⚛️ Sci-Core AI")
+    st.title(" Sci-Core AI")
     st.caption("v3.3 Refined UI")
     
     # テーマ選択
-    theme_mode = st.radio("🎨 Theme Color", ["Dark", "Light"], horizontal=True)
+    theme_mode = st.radio("Theme Color", ["Dark", "Light"], horizontal=True)
 
 # CSSの動的生成
 if theme_mode == "Dark":
@@ -63,7 +63,7 @@ st.markdown(f"""
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
 except:
-    st.error("⚠️ APIキーが設定されていません")
+    st.error("APIキーが設定されていません")
     st.stop()
 
 client = genai.Client(api_key=api_key)
@@ -99,7 +99,7 @@ with st.sidebar:
     col2.metric("B", "on-line")
     col3.metric("C", "on-line")
     
-    if st.button("🗑️ 履歴を消去"):
+    if st.button("履歴を消去"):
         st.session_state.messages = []
         st.rerun()
 
@@ -123,16 +123,16 @@ with st.form(key="chat_form", clear_on_submit=True):
     col_input, col_btn = st.columns([8, 1])
     
     # テキスト入力エリア (Enterで改行される)
-    user_input = st.text_area("質問を入力...", height=100, label_visibility="collapsed", placeholder="Ctrl+Enterで送信はできませんが、Enterで改行できます。")
+    user_input = st.text_area("質問を入力...", height=100, label_visibility="collapsed", placeholder="Ctrl+Enterで送信はできます。")
     
     # 画像アップロードと送信ボタンを横並びっぽく配置
     c1, c2 = st.columns([1, 4])
     with c1:
         # アップロードボタン
-        uploaded_file = st.file_uploader("📷 画像", type=["jpg", "png"], label_visibility="collapsed")
+        uploaded_file = st.file_uploader("画像", type=["jpg", "png"], label_visibility="collapsed")
     with c2:
         # 送信ボタン
-        submit_btn = st.form_submit_button("🚀 送信")
+        submit_btn = st.form_submit_button("送信")
 
 # --- 処理実行 ---
 if submit_btn and user_input:
