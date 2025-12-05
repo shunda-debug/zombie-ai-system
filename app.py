@@ -95,9 +95,9 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### 🖥️ System Status")
     col1, col2, col3 = st.columns(3)
-    col1.metric("A", "on-line")
-    col2.metric("B", "on-line")
-    col3.metric("C", "on-line")
+    col1.metric("A", "here")
+    col2.metric("B", "here")
+    col3.metric("C", "here")
     
     if st.button("履歴を消去"):
         st.session_state.messages = []
@@ -123,7 +123,7 @@ with st.form(key="chat_form", clear_on_submit=True):
     col_input, col_btn = st.columns([8, 1])
     
     # テキスト入力エリア (Enterで改行される)
-    user_input = st.text_area("質問を入力...", height=100, label_visibility="collapsed", placeholder="Ctrl+Enterで送信はできます。")
+    user_input = st.text_area("質問を入力...", height=100, label_visibility="collapsed", placeholder="Ctrl+Enterで送信できます。")
     
     # 画像アップロードと送信ボタンを横並びっぽく配置
     c1, c2 = st.columns([1, 4])
