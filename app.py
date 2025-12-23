@@ -2,37 +2,37 @@ import streamlit as st
 from google import genai
 import concurrent.futures
 
-# --- 1. ページ設定 (Minimalist Design) ---
+# --- 1. ページ設定 ---
 st.set_page_config(page_title="Sci-Core", page_icon="⚛️", layout="wide")
 
-# --- 2. デザイン (洗練されたミニマリズム) ---
+# --- 2. デザイン (Disney Protocol / Dark Minimal) ---
 st.markdown("""
 <style>
-    /* 全体のフォントと背景を調整 */
+    /* 全体のフォントと背景 */
     .stApp {
-        background-color: #0E1117; /* 深い黒 (Gemini Dark風) */
+        background-color: #0E1117;
         color: #E0E0E0;
     }
     
-    /* 入力エリアをシンプルに */
+    /* 入力エリア */
     .stChatInputContainer {
         background-color: #0E1117;
         border-top: 1px solid #333;
     }
     
-    /* ユーザーの吹き出し (目立たないグレー) */
+    /* ユーザーの吹き出し */
     .stChatMessage[data-testid="user"] {
         background-color: #262730;
         border: none;
     }
     
-    /* AIの吹き出し (背景なし、文字のみ強調) */
+    /* AIの吹き出し */
     .stChatMessage[data-testid="assistant"] {
         background-color: transparent;
         border: none;
     }
     
-    /* 思考プロセスのExpanderをスタイリッシュに */
+    /* Expanderのスタイル */
     .streamlit-expanderHeader {
         background-color: #161B22;
         color: #888;
@@ -48,73 +48,74 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- APIキー ---
+# --- APIキー設定 ---
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
 except:
-    st.error("🚨 API Key Error")
+    st.error("🚨 エラー: SecretsにAPIキーが設定されていません。")
     st.stop()
 
-client = genai.Client(api_key=api_key)
+# クライアント初期化
+try:
+    client = genai.Client(api_key=api_key)
+except Exception as e:
+    st.error(f"クライアント初期化エラー: {e}")
+    st.stop()
 
 # --- 履歴管理 ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# --- AI脳みそ (並列処理対応) ---
+# --- AI脳みそ (デバッグモード搭載) ---
 def call_ai(prompt, role):
     try:
-        # 役割ごとのシステム命令 (Disney Strategy)
+        # 役割ごとのシステム命令
         if role == "A": # Dreamer
             sys = """
             あなたは「肯定的なドリーマー（Dreamer）」です。
-            ユーザーの問いに対し、制限（予算、技術、時間）を無視して、
-            最も理想的で、ワクワクする、革新的なアイデアを提案してください。
+            ユーザーの問いに対し、制限を無視して、
+            最も理想的で、ワクワクする革新的なアイデアを提案してください。
             批判は一切せず、可能性を広げることだけに集中してください。
             """
-        elif role == "B": # Realist/Critic
+        elif role == "B": # Realist
             sys = """
             あなたは「批判的なリアリスト（Critic）」です。
-            ユーザーの問いに対し、現実的な視点（予算、時間、物理法則、リスク）から
+            ユーザーの問いに対し、現実的な視点（予算、時間、技術、リスク）から
             懸念点や欠陥を厳しく指摘してください。
-            甘い考えを捨て、最悪のケースや障害を列挙してください。
+            甘い考えを捨て、障害を列挙してください。
             """
         else: # C: Judge
             sys = """
             あなたは「統合する調整者（Judge）」です。
-            あなたはユーザーの質問と、それに対する「A（理想案）」と「B（批判案）」を持っています。
-            
-            あなたの仕事は、Bの懸念をAのアイデアでどう乗り越えるか、
-            あるいはAのアイデアをBの制約の中でどう実現するか、
-            「第3の解決策（アウフヘーベン）」を導き出すことです。
-            
-            回答は、AやBの議論には触れず、**あなたが出した「最終結論」のみ**を、
+            A（理想）とB（現実）の議論を踏まえ、
+            「第3の解決策（アウフヘーベン）」を導き出してください。
+            回答は、AやBの議論には触れず、あなたが出した「最終結論」のみを
             論理的かつ洗練された文章で出力してください。
             """
         
+        # API呼び出し (gemini-1.5-flash)
         res = client.models.generate_content(
             model="gemini-1.5-flash", 
             contents=prompt,
             config={"system_instruction": sys}
         )
         return res.text.strip()
-    except:
-        return "Error"
+        
+    except Exception as e:
+        # 【重要】エラーの正体をそのまま返す
+        return f"🚨 DEBUG_ERROR: {str(e)}"
 
-# --- 並列処理関数 (時間を短縮する魔法) ---
+# --- 並列処理関数 ---
 def run_parallel_thinking(prompt):
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        # AとBを「ヨーイドン」で同時に走らせる
         future_a = executor.submit(call_ai, prompt, "A")
         future_b = executor.submit(call_ai, prompt, "B")
-        
-        # 両方が終わるのを待って結果を受け取る
         return future_a.result(), future_b.result()
 
 # --- サイドバー ---
 with st.sidebar:
     st.title("⚛️ Sci-Core")
-    st.caption("Disney Protocol v5.0")
+    st.caption("Disney Protocol v5.1")
     
     st.markdown("---")
     if st.button("New Chat", type="primary", use_container_width=True):
@@ -126,7 +127,6 @@ with st.sidebar:
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
-        # 思考プロセスがあれば表示 (Google AI Studio風)
         if "thoughts" in message:
             with st.expander("✨ Thoughts (Process A vs B)"):
                 st.markdown(message["thoughts"])
@@ -142,29 +142,21 @@ if prompt:
 
     # AI処理
     with st.chat_message("assistant"):
-        # ステータス表示（カッコよく）
         status_box = st.status("Thinking...", expanded=True)
         
-        # 1. AとBが並列で議論 (パラレル処理)
+        # 1. AとBが並列で議論
         status_box.write("⚡ Dreamer & Critic are debating...")
         res_a, res_b = run_parallel_thinking(prompt)
         
-        # 2. Cが統合 (ジャッジ)
+        # 2. Cが統合
         status_box.write("👨‍⚖️ Judge is synthesizing...")
         
-        judge_input = f"""
-        【ユーザーの質問】
-        {prompt}
-        
-        【Aの意見（理想）】
-        {res_a}
-        
-        【Bの意見（現実）】
-        {res_b}
-        
-        これらを統合し、最適な回答を作成せよ。
-        """
-        final_answer = call_ai(judge_input, "C")
+        # もしAかBでエラーが出ていたら、Judgeにはエラー文ごと渡して無理やり処理させるか、停止する
+        if "DEBUG_ERROR" in res_a or "DEBUG_ERROR" in res_b:
+             final_answer = "⚠️ エラーが発生しました。下のThoughtsを開いて詳細を確認してください。"
+        else:
+            judge_input = f"質問:{prompt}\n案A:{res_a}\n案B:{res_b}\n統合して結論を出せ。"
+            final_answer = call_ai(judge_input, "C")
         
         # 完了
         status_box.update(label="Complete", state="complete", expanded=False)
@@ -172,15 +164,8 @@ if prompt:
         # 結果表示
         st.markdown(final_answer)
         
-        # 思考ログの作成
-        thoughts_log = f"""
-        **🚀 Agent A (Dreamer):**
-        {res_a}
-        
-        ---
-        **🛡️ Agent B (Realist):**
-        {res_b}
-        """
+        # 思考ログ
+        thoughts_log = f"**🚀 Agent A:**\n{res_a}\n\n---\n**🛡️ Agent B:**\n{res_b}"
         
         with st.expander("✨ Thoughts (Process A vs B)"):
             st.markdown(thoughts_log)
