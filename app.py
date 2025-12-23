@@ -1,61 +1,51 @@
 import streamlit as st
-import time
 from google import genai
 from PIL import Image
 
-# --- 1. ページ設定 ---
+# --- 1. ページ設定 (最初に行う) ---
 st.set_page_config(page_title="Sci-Core AI", page_icon="⚛️", layout="wide")
 
-# --- 2. テーマ管理とCSS ---
-# サイドバーでテーマ切り替え
-with st.sidebar:
-    st.title(" Sci-Core AI")
-    st.caption("v3.3 Refined UI")
-    
-    # テーマ選択
-    theme_mode = st.radio("Theme Color", ["Dark", "Light"], horizontal=True)
-
-# CSSの動的生成
-if theme_mode == "Dark":
-    bg_color = "#0E1117"
-    text_color = "#FFFFFF"
-    input_bg = "#262730"
-    border_color = "#4E5359"
-else:
-    bg_color = "#FFFFFF"
-    text_color = "#000000"
-    input_bg = "#F0F2F6"
-    border_color = "#D0D0D0"
-
-st.markdown(f"""
+# --- 2. デザインの強制適用 (CSSハック) ---
+# ライトモードを排除し、最強のダークモードを強制します
+st.markdown("""
 <style>
-    /* 全体の背景と文字色 */
-    .stApp {{ background-color: {bg_color} !important; color: {text_color} !important; }}
-    
-    /* 文字色を強制適用（pタグやhタグなど） */
-    p, h1, h2, h3, h4, h5, h6, li, span, div {{ color: {text_color} !important; }}
-    
-    /* 入力エリアのスタイル */
-    .stTextArea textarea {{ background-color: {input_bg} !important; color: {text_color} !important; border: 1px solid {border_color}; }}
+    /* 全体の背景を漆黒に */
+    .stApp {
+        background-color: #050505 !important;
+        color: #E0E0E0 !important;
+    }
     
     /* サイドバーの背景 */
-    [data-testid="stSidebar"] {{ background-color: {input_bg} !important; }}
+    [data-testid="stSidebar"] {
+        background-color: #0F0F0F !important;
+        border-right: 1px solid #333;
+    }
     
-    /* 数式の文字色（青系で統一） */
-    .katex {{ color: #4B91F1 !important; font-size: 1.2em !important; }}
+    /* 入力欄（LINE風）のスタイル調整 */
+    .stChatInputContainer {
+        background-color: #050505 !important;
+    }
     
-    /* 送信ボタンを目立たせる */
-    div[data-testid="stFormSubmitButton"] button {{
-        background-color: #238636; 
-        color: white !important; 
-        border: none;
-        width: 100%;
-    }}
+    /* ヘッダーの非表示（スッキリさせる） */
+    header {visibility: hidden;}
     
-    /* アップローダーを目立たなくスタイリッシュに */
-    [data-testid="stFileUploader"] {{
-        padding: 0px;
-    }}
+    /* 数式の文字色（ネオンブルー） */
+    .katex { color: #4DA6FF !important; }
+    
+    /* ユーザーの吹き出し */
+    .stChatMessage[data-testid="user"] {
+        background-color: #1E1E1E;
+        border-radius: 15px;
+        padding: 10px;
+    }
+    
+    /* AIの吹き出し */
+    .stChatMessage[data-testid="assistant"] {
+        background-color: #000000;
+        border: 1px solid #333;
+        border-radius: 15px;
+        padding: 10px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -63,7 +53,7 @@ st.markdown(f"""
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
 except:
-    st.error("APIキーが設定されていません")
+    st.error("🚨 API Key Missing")
     st.stop()
 
 client = genai.Client(api_key=api_key)
@@ -72,13 +62,12 @@ client = genai.Client(api_key=api_key)
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# --- AI脳みそ ---
+# --- AI関数 ---
 def call_science_model(client, prompt, image=None, role="solver"):
     try:
-        if role == "solver":
-            sys_instruction = "あなたは科学技術計算AIです。数式は$$を使用し、途中式を丁寧に記述してください。"
-        else: 
-            sys_instruction = "あなたは査読者です。複数の回答を比較し、最適な最終回答を作成してください。"
+        sys_instruction = "あなたは科学技術計算AIです。数式は$$を使用し、論理的かつ簡潔に答えてください。"
+        if role == "judge":
+            sys_instruction = "あなたは査読者です。複数の回答を統合し、完璧な最終回答を作成してください。"
         
         contents = [prompt, image] if image else prompt
         res = client.models.generate_content(
@@ -90,74 +79,65 @@ def call_science_model(client, prompt, image=None, role="solver"):
     except:
         return None
 
-# --- サイドバー (機能) ---
+# --- サイドバー ---
 with st.sidebar:
-    st.markdown("---")
-    st.markdown("### 🖥️ System Status")
-    col1, col2, col3 = st.columns(3)
-    col1.metric("A", "here")
-    col2.metric("B", "here")
-    col3.metric("C", "here")
+    st.title("⚛️ Sci-Core")
+    st.caption("Autonomous Reasoning System")
     
-    if st.button("履歴を消去"):
+    st.markdown("---")
+    # 画像アップロードをサイドバーに隠してスッキリさせる
+    st.markdown("### 📎 画像解析")
+    uploaded_file = st.file_uploader("Upload Image", type=["jpg", "png"], label_visibility="collapsed")
+    
+    st.markdown("---")
+    if st.button("🗑️ 履歴クリア", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
 
-# --- メインチャット画面 ---
-st.title("zombie-AI v1.1")
+# --- メイン画面 ---
+st.markdown("## ⚛️ Sci-Core AI Project")
+st.caption("Multi-Agent Reasoning Engine")
 
-# チャット履歴の表示
+# チャット履歴表示
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
-        if "image" in message:
+        if "image" in message and message["image"]:
             st.image(message["image"], width=250)
         st.markdown(message["content"])
         if "details" in message:
-            with st.expander("🔍 解析詳細"):
+            with st.expander("🔍 思考プロセス (3機のAIによる推論)"):
                 st.markdown(message["details"])
 
-# --- 新しい入力エリア (画面下部に固定) ---
-st.markdown("---")
-# フォームを使うことで「送信ボタンを押すまで送信されない」を実現
-with st.form(key="chat_form", clear_on_submit=True):
-    col_input, col_btn = st.columns([8, 1])
-    
-    # テキスト入力エリア (Enterで改行される)
-    user_input = st.text_area("質問を入力...", height=100, label_visibility="collapsed", placeholder="Ctrl+Enterで送信できます。")
-    
-    # 画像アップロードと送信ボタンを横並びっぽく配置
-    c1, c2 = st.columns([1, 4])
-    with c1:
-        # アップロードボタン
-        uploaded_file = st.file_uploader("画像", type=["jpg", "png"], label_visibility="collapsed")
-    with c2:
-        # 送信ボタン
-        submit_btn = st.form_submit_button("送信")
+# --- 入力エリア (最新のチャットインターフェース) ---
+# これがスマホでも使いやすい「送信ボタン付き」の入力欄です
+prompt = st.chat_input("質問を入力... (Shift+Enterで改行)")
 
-# --- 処理実行 ---
-if submit_btn and user_input:
+if prompt:
+    # 画像の処理
     image = Image.open(uploaded_file) if uploaded_file else None
     
-    # ユーザー投稿表示
+    # ユーザー表示
     with st.chat_message("user"):
         if image: st.image(image, width=250)
-        st.markdown(user_input)
+        st.markdown(prompt)
     
     # 履歴保存
-    msg_data = {"role": "user", "content": user_input}
+    msg_data = {"role": "user", "content": prompt}
     if image: msg_data["image"] = image
     st.session_state.messages.append(msg_data)
     
     # AI処理
     with st.chat_message("assistant"):
         status = st.empty()
-        status.info("⚡ Sci-Core Processing...")
+        status.markdown("`⚡ Sci-Core is thinking...`")
         
-        # Solver & Judge (簡易化のため直列処理に見せていますがロジックは維持)
-        res_a = call_science_model(client, user_input, image, "solver")
-        res_b = call_science_model(client, user_input, image, "solver")
+        # 並列処理風の演出
+        res_a = call_science_model(client, prompt, image, "solver")
+        res_b = call_science_model(client, prompt, image, "solver")
         
-        judge_prompt = f"質問: {user_input}\n回答A: {res_a}\n回答B: {res_b}\nこれらを統合して回答せよ。"
+        status.markdown("`👨‍⚖️ Judge is verifying...`")
+        
+        judge_prompt = f"質問: {prompt}\n回答A: {res_a}\n回答B: {res_b}\nこれらを統合し、洗練された回答を作成せよ。"
         final_answer = call_science_model(client, judge_prompt, None, "judge")
         
         if final_answer:
@@ -166,9 +146,7 @@ if submit_btn and user_input:
             st.session_state.messages.append({
                 "role": "assistant", 
                 "content": final_answer,
-                "details": f"**A:** {res_a}\n\n**B:** {res_b}"
+                "details": f"**Core A:** {res_a}\n\n**Core B:** {res_b}"
             })
         else:
-            status.error("Error occurred")
-            
-    st.rerun()
+            status.error("System Error")
