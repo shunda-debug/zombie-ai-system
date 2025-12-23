@@ -1,5 +1,6 @@
 import streamlit as st
-import google.generativeai as genai
+import requests
+import json
 import concurrent.futures
 
 # --- 1. ページ設定 ---
@@ -14,62 +15,70 @@ st.markdown("""
     .stChatMessage[data-testid="assistant"] { background-color: transparent; border: none; }
     .streamlit-expanderHeader { background-color: #161B22; color: #888; font-size: 0.9em; border-radius: 5px; }
     header {visibility: hidden;}
-    .katex { color: #A8C7FA !important; }
 </style>
 """, unsafe_allow_html=True)
 
 # --- APIキー設定 ---
 try:
-    api_key = st.secrets["GEMINI_API_KEY"]
-    genai.configure(api_key=api_key)
-except Exception as e:
-    st.error(f"🚨 Secrets設定エラー: {str(e)}")
+    API_KEY = st.secrets["GEMINI_API_KEY"]
+except:
+    st.error("🚨 エラー: SecretsにAPIキーが設定されていません。")
     st.stop()
 
 # --- 履歴管理 ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# --- AI脳みそ (最強のデバッグ仕様) ---
-def call_ai(prompt, role):
-    # 役割ごとのシステム命令
+# --- AI脳みそ (直接HTTP通信版 - ライブラリ不要) ---
+def call_ai_direct(prompt, role):
+    # エンドポイントURL (Gemini 1.5 Flash)
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY}"
+    
+    # 役割ごとのシステムプロンプト
     if role == "A":
-        sys_prompt = "あなたは肯定的なドリーマーです。制限を無視して理想的なアイデアを出してください。"
+        sys_msg = "あなたは肯定的なドリーマーです。制限を無視して理想的なアイデアを出してください。"
     elif role == "B":
-        sys_prompt = "あなたは批判的なリアリストです。現実的なリスクや欠陥を指摘してください。"
+        sys_msg = "あなたは批判的なリアリストです。現実的なリスクや欠陥を指摘してください。"
     else:
-        sys_prompt = "あなたは調整役です。AとBの意見を統合し、最適な結論を出してください。"
+        sys_msg = "あなたは調整役です。AとBの意見を統合し、最適な結論を出してください。"
 
-    full_prompt = f"{sys_prompt}\n\n【ユーザーの入力】\n{prompt}"
+    # リクエストの中身（JSON）
+    payload = {
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }],
+        "systemInstruction": {
+            "parts": [{"text": sys_msg}]
+        }
+    }
+    
+    headers = {'Content-Type': 'application/json'}
 
-    # 1. まず最新の Flash を試す
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(full_prompt)
-        return response.text.strip()
-    except Exception as e_flash:
-        # 2. ダメなら Pro (安定版) を試す
-        try:
-            model = genai.GenerativeModel('gemini-pro')
-            response = model.generate_content(full_prompt)
-            return response.text.strip()
-        except Exception as e_pro:
-            # 【重要】エラーの正体を隠さずに全部表示する！
-            return f"💀 FATAL ERROR:\n[Flash]: {e_flash}\n[Pro]: {e_pro}"
+        # 直接POSTリクエストを送信
+        response = requests.post(url, headers=headers, data=json.dumps(payload))
+        
+        # 結果の解析
+        if response.status_code == 200:
+            data = response.json()
+            return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+        else:
+            return f"Error {response.status_code}: {response.text}"
+            
+    except Exception as e:
+        return f"通信エラー: {str(e)}"
 
 # --- 並列処理関数 ---
 def run_parallel_thinking(prompt):
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        future_a = executor.submit(call_ai, prompt, "A")
-        future_b = executor.submit(call_ai, prompt, "B")
+        future_a = executor.submit(call_ai_direct, prompt, "A")
+        future_b = executor.submit(call_ai_direct, prompt, "B")
         return future_a.result(), future_b.result()
 
 # --- サイドバー ---
 with st.sidebar:
     st.title("⚛️ Sci-Core")
-    st.caption("Disney Protocol v5.4 Debug")
-    
-    st.markdown("---")
+    st.caption("Direct-Link Protocol v6.0")
     if st.button("New Chat", type="primary", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
@@ -79,19 +88,17 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
         if "thoughts" in message:
-            with st.expander("✨ Thoughts (Process A vs B)"):
+            with st.expander("✨ Thoughts"):
                 st.markdown(message["thoughts"])
 
 # --- 入力エリア ---
 prompt = st.chat_input("質問を入力...")
 
 if prompt:
-    # ユーザー表示
     with st.chat_message("user"):
         st.markdown(prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})
 
-    # AI処理
     with st.chat_message("assistant"):
         status_box = st.status("Thinking...", expanded=True)
         
@@ -100,19 +107,16 @@ if prompt:
         
         status_box.write("👨‍⚖️ Judge is synthesizing...")
         judge_input = f"質問:{prompt}\n案A:{res_a}\n案B:{res_b}\n統合して結論を出せ。"
-        final_answer = call_ai(judge_input, "C")
+        final_answer = call_ai_direct(judge_input, "C")
         
         status_box.update(label="Complete", state="complete", expanded=False)
         
-        # 結果表示
         st.markdown(final_answer)
         
-        # エラーが起きていたら目立つように表示
         thoughts_log = f"**🚀 Agent A:**\n{res_a}\n\n---\n**🛡️ Agent B:**\n{res_b}"
-        with st.expander("✨ Thoughts (Process A vs B)"):
+        with st.expander("✨ Thoughts"):
             st.markdown(thoughts_log)
             
-        # 履歴保存
         st.session_state.messages.append({
             "role": "assistant", 
             "content": final_answer, 
