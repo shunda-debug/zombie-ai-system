@@ -1,37 +1,50 @@
 import streamlit as st
 from google import genai
-from PIL import Image
+import concurrent.futures
 
-# --- 1. ページ設定 ---
-st.set_page_config(page_title="Sci-Core AI", page_icon="⚛️", layout="wide")
+# --- 1. ページ設定 (Minimalist Design) ---
+st.set_page_config(page_title="Sci-Core", page_icon="⚛️", layout="wide")
 
-# --- 2. デザイン (Dark Mode & UI調整) ---
+# --- 2. デザイン (洗練されたミニマリズム) ---
 st.markdown("""
 <style>
-    /* 全体をダークモードに固定 */
+    /* 全体のフォントと背景を調整 */
     .stApp {
-        background-color: #0E1117 !important;
-        color: #E0E0E0 !important;
+        background-color: #0E1117; /* 深い黒 (Gemini Dark風) */
+        color: #E0E0E0;
     }
     
-    /* 入力エリアの背景色 */
-    .stTextArea textarea {
-        background-color: #262730 !important;
-        color: #FFFFFF !important;
-        border: 1px solid #4E5359;
+    /* 入力エリアをシンプルに */
+    .stChatInputContainer {
+        background-color: #0E1117;
+        border-top: 1px solid #333;
     }
     
-    /* 送信ボタンを緑色にして目立たせる */
-    div[data-testid="stFormSubmitButton"] button {
-        background-color: #238636;
-        color: white !important;
+    /* ユーザーの吹き出し (目立たないグレー) */
+    .stChatMessage[data-testid="user"] {
+        background-color: #262730;
         border: none;
-        width: 100%;
-        font-weight: bold;
     }
     
-    /* 数式の文字色 */
-    .katex { color: #4DA6FF !important; font-size: 1.1em !important; }
+    /* AIの吹き出し (背景なし、文字のみ強調) */
+    .stChatMessage[data-testid="assistant"] {
+        background-color: transparent;
+        border: none;
+    }
+    
+    /* 思考プロセスのExpanderをスタイリッシュに */
+    .streamlit-expanderHeader {
+        background-color: #161B22;
+        color: #888;
+        font-size: 0.9em;
+        border-radius: 5px;
+    }
+    
+    /* ヘッダー隠し */
+    header {visibility: hidden;}
+    
+    /* 数式カラー */
+    .katex { color: #A8C7FA !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -39,7 +52,7 @@ st.markdown("""
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
 except:
-    st.error("🚨 エラー: SecretsにAPIキーが設定されていません。")
+    st.error("🚨 API Key Error")
     st.stop()
 
 client = genai.Client(api_key=api_key)
@@ -48,112 +61,133 @@ client = genai.Client(api_key=api_key)
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# --- AI関数 (エラー詳細表示付き) ---
-def call_science_model(client, prompt, image=None, role="solver"):
+# --- AI脳みそ (並列処理対応) ---
+def call_ai(prompt, role):
     try:
-        # 役割定義
-        if role == "solver":
-            sys_instruction = "あなたは科学技術計算AIです。数式は$$を使用し、論理的かつ簡潔に答えてください。"
-        else:
-            sys_instruction = "あなたは査読者です。複数の回答を統合し、完璧な最終回答を作成してください。"
+        # 役割ごとのシステム命令 (Disney Strategy)
+        if role == "A": # Dreamer
+            sys = """
+            あなたは「肯定的なドリーマー（Dreamer）」です。
+            ユーザーの問いに対し、制限（予算、技術、時間）を無視して、
+            最も理想的で、ワクワクする、革新的なアイデアを提案してください。
+            批判は一切せず、可能性を広げることだけに集中してください。
+            """
+        elif role == "B": # Realist/Critic
+            sys = """
+            あなたは「批判的なリアリスト（Critic）」です。
+            ユーザーの問いに対し、現実的な視点（予算、時間、物理法則、リスク）から
+            懸念点や欠陥を厳しく指摘してください。
+            甘い考えを捨て、最悪のケースや障害を列挙してください。
+            """
+        else: # C: Judge
+            sys = """
+            あなたは「統合する調整者（Judge）」です。
+            あなたはユーザーの質問と、それに対する「A（理想案）」と「B（批判案）」を持っています。
+            
+            あなたの仕事は、Bの懸念をAのアイデアでどう乗り越えるか、
+            あるいはAのアイデアをBの制約の中でどう実現するか、
+            「第3の解決策（アウフヘーベン）」を導き出すことです。
+            
+            回答は、AやBの議論には触れず、**あなたが出した「最終結論」のみ**を、
+            論理的かつ洗練された文章で出力してください。
+            """
         
-        # 画像がある場合とない場合で分岐
-        contents = [prompt, image] if image else prompt
-        
-        # モデルを安定版(1.5-flash)に固定
         res = client.models.generate_content(
             model="gemini-1.5-flash", 
-            contents=contents,
-            config={"system_instruction": sys_instruction}
+            contents=prompt,
+            config={"system_instruction": sys}
         )
         return res.text.strip()
-    except Exception as e:
-        # エラーの正体を返す
-        return f"ERROR: {str(e)}"
+    except:
+        return "Error"
+
+# --- 並列処理関数 (時間を短縮する魔法) ---
+def run_parallel_thinking(prompt):
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        # AとBを「ヨーイドン」で同時に走らせる
+        future_a = executor.submit(call_ai, prompt, "A")
+        future_b = executor.submit(call_ai, prompt, "B")
+        
+        # 両方が終わるのを待って結果を受け取る
+        return future_a.result(), future_b.result()
 
 # --- サイドバー ---
 with st.sidebar:
     st.title("⚛️ Sci-Core")
-    st.caption("v4.1 Stable Edition")
-    
-    st.success("🟢 System: Online")
+    st.caption("Disney Protocol v5.0")
     
     st.markdown("---")
-    # リセットボタン
-    if st.button("🗑️ 会話をリセット", use_container_width=True):
+    if st.button("New Chat", type="primary", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
 
 # --- メイン画面 ---
-st.title("⚛️ Sci-Core AI Project")
-
 # 履歴表示
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
-        if "image" in message and message["image"]:
-            st.image(message["image"], width=250)
         st.markdown(message["content"])
-        if "details" in message:
-            with st.expander("🔍 思考プロセス"):
-                st.markdown(message["details"])
+        # 思考プロセスがあれば表示 (Google AI Studio風)
+        if "thoughts" in message:
+            with st.expander("✨ Thoughts (Process A vs B)"):
+                st.markdown(message["thoughts"])
 
-# --- 入力エリア (フォーム形式に戻しました) ---
-st.markdown("---")
+# --- 入力エリア ---
+prompt = st.chat_input("質問やアイデアを入力してください...")
 
-with st.form(key="chat_form", clear_on_submit=True):
-    # スマホでも改行しやすいテキストエリア
-    user_input = st.text_area("質問を入力...", height=100, placeholder="スマホなら「改行」で次の行へ。送信はボタンで。")
-    
-    col1, col2 = st.columns([1, 4])
-    with col1:
-        # 画像アップロード
-        uploaded_file = st.file_uploader("画像", type=["jpg", "png"], label_visibility="collapsed")
-    with col2:
-        # 送信ボタン (これが欲しかったやつです！)
-        submit_btn = st.form_submit_button("🚀 送信 (Analyze)")
-
-# --- 処理実行 ---
-if submit_btn and user_input:
-    # 画像処理
-    image = Image.open(uploaded_file) if uploaded_file else None
-    
+if prompt:
     # ユーザー表示
     with st.chat_message("user"):
-        if image: st.image(image, width=250)
-        st.markdown(user_input)
-    
-    # 履歴保存
-    msg_data = {"role": "user", "content": user_input}
-    if image: msg_data["image"] = image
-    st.session_state.messages.append(msg_data)
-    
+        st.markdown(prompt)
+    st.session_state.messages.append({"role": "user", "content": prompt})
+
     # AI処理
     with st.chat_message("assistant"):
-        status = st.empty()
-        status.info("Sci-Core is thinking...")
+        # ステータス表示（カッコよく）
+        status_box = st.status("Thinking...", expanded=True)
         
-        # Solver実行
-        res_a = call_science_model(client, user_input, image, "solver")
-        res_b = call_science_model(client, user_input, image, "solver")
+        # 1. AとBが並列で議論 (パラレル処理)
+        status_box.write("⚡ Dreamer & Critic are debating...")
+        res_a, res_b = run_parallel_thinking(prompt)
         
-        # もしエラーが返ってきていたら表示する
-        if "ERROR:" in res_a:
-            status.error(f"通信エラーが発生しました: {res_a}")
-        else:
-            status.info("Judge is verifying...")
-            judge_prompt = f"質問: {user_input}\n回答A: {res_a}\n回答B: {res_b}\nこれらを統合し、回答せよ。"
-            final_answer = call_science_model(client, judge_prompt, None, "judge")
+        # 2. Cが統合 (ジャッジ)
+        status_box.write("👨‍⚖️ Judge is synthesizing...")
+        
+        judge_input = f"""
+        【ユーザーの質問】
+        {prompt}
+        
+        【Aの意見（理想）】
+        {res_a}
+        
+        【Bの意見（現実）】
+        {res_b}
+        
+        これらを統合し、最適な回答を作成せよ。
+        """
+        final_answer = call_ai(judge_input, "C")
+        
+        # 完了
+        status_box.update(label="Complete", state="complete", expanded=False)
+        
+        # 結果表示
+        st.markdown(final_answer)
+        
+        # 思考ログの作成
+        thoughts_log = f"""
+        **🚀 Agent A (Dreamer):**
+        {res_a}
+        
+        ---
+        **🛡️ Agent B (Realist):**
+        {res_b}
+        """
+        
+        with st.expander("✨ Thoughts (Process A vs B)"):
+            st.markdown(thoughts_log)
             
-            if final_answer and "ERROR:" not in final_answer:
-                status.empty()
-                st.markdown(final_answer)
-                st.session_state.messages.append({
-                    "role": "assistant", 
-                    "content": final_answer,
-                    "details": f"**Core A:** {res_a}\n\n**Core B:** {res_b}"
-                })
-            else:
-                status.error(f"最終判定でエラー: {final_answer}")
-    
-    # 処理が終わったらリロードして表示を更新
-    st.rerun()
+        # 履歴保存
+        st.session_state.messages.append({
+            "role": "assistant", 
+            "content": final_answer, 
+            "thoughts": thoughts_log
+        })
