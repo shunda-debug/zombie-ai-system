@@ -5,7 +5,7 @@ import concurrent.futures
 # --- 1. ページ設定 ---
 st.set_page_config(page_title="Sci-Core", page_icon="⚛️", layout="wide")
 
-# --- 2. デザイン (Disney Protocol / Dark Minimal) ---
+# --- 2. デザイン (Dark Minimal) ---
 st.markdown("""
 <style>
     .stApp { background-color: #0E1117; color: #E0E0E0; }
@@ -22,17 +22,17 @@ st.markdown("""
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=api_key)
-except:
-    st.error("🚨 エラー: SecretsにAPIキーが設定されていません。")
+except Exception as e:
+    st.error(f"🚨 Secrets設定エラー: {str(e)}")
     st.stop()
 
 # --- 履歴管理 ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# --- AI脳みそ (安全装置付き) ---
+# --- AI脳みそ (最強のデバッグ仕様) ---
 def call_ai(prompt, role):
-    # 役割ごとの命令
+    # 役割ごとのシステム命令
     if role == "A":
         sys_prompt = "あなたは肯定的なドリーマーです。制限を無視して理想的なアイデアを出してください。"
     elif role == "B":
@@ -42,20 +42,20 @@ def call_ai(prompt, role):
 
     full_prompt = f"{sys_prompt}\n\n【ユーザーの入力】\n{prompt}"
 
-    # 【重要】モデルを順番に試すロジック
-    # 1. まず最新のFlashを試す
-    # 2. ダメなら安定版のProを試す
-    models_to_try = ['gemini-1.5-flash', 'gemini-pro']
-    
-    for model_name in models_to_try:
+    # 1. まず最新の Flash を試す
+    try:
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content(full_prompt)
+        return response.text.strip()
+    except Exception as e_flash:
+        # 2. ダメなら Pro (安定版) を試す
         try:
-            model = genai.GenerativeModel(model_name)
+            model = genai.GenerativeModel('gemini-pro')
             response = model.generate_content(full_prompt)
             return response.text.strip()
-        except Exception:
-            continue # 次のモデルを試す
-            
-    return "🚨 エラー: 全てのモデルで通信に失敗しました。APIキーか通信環境を確認してください。"
+        except Exception as e_pro:
+            # 【重要】エラーの正体を隠さずに全部表示する！
+            return f"💀 FATAL ERROR:\n[Flash]: {e_flash}\n[Pro]: {e_pro}"
 
 # --- 並列処理関数 ---
 def run_parallel_thinking(prompt):
@@ -67,7 +67,8 @@ def run_parallel_thinking(prompt):
 # --- サイドバー ---
 with st.sidebar:
     st.title("⚛️ Sci-Core")
-    st.caption("Disney Protocol v5.3 (Auto-Fix)")
+    st.caption("Disney Protocol v5.4 Debug")
+    
     st.markdown("---")
     if st.button("New Chat", type="primary", use_container_width=True):
         st.session_state.messages = []
@@ -82,13 +83,15 @@ for message in st.session_state.messages:
                 st.markdown(message["thoughts"])
 
 # --- 入力エリア ---
-prompt = st.chat_input("質問やアイデアを入力してください...")
+prompt = st.chat_input("質問を入力...")
 
 if prompt:
+    # ユーザー表示
     with st.chat_message("user"):
         st.markdown(prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})
 
+    # AI処理
     with st.chat_message("assistant"):
         status_box = st.status("Thinking...", expanded=True)
         
@@ -101,12 +104,15 @@ if prompt:
         
         status_box.update(label="Complete", state="complete", expanded=False)
         
+        # 結果表示
         st.markdown(final_answer)
         
+        # エラーが起きていたら目立つように表示
         thoughts_log = f"**🚀 Agent A:**\n{res_a}\n\n---\n**🛡️ Agent B:**\n{res_b}"
         with st.expander("✨ Thoughts (Process A vs B)"):
             st.markdown(thoughts_log)
             
+        # 履歴保存
         st.session_state.messages.append({
             "role": "assistant", 
             "content": final_answer, 
