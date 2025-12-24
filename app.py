@@ -1,92 +1,204 @@
 import streamlit as st
 import requests
-import json
 import concurrent.futures
 
-st.set_page_config(page_title="Sci-Core", page_icon="⚛️", layout="wide")
+# -------------------------------
+#  基本設定 / UIテーマ
+# -------------------------------
+st.set_page_config(
+    page_title="Sci-Core AI — Disney Protocol Edition",
+    layout="centered"
+)
 
-# デザイン
-st.markdown("""<style>.stApp { background-color: #0E1117; color: #E0E0E0; } .stChatInputContainer { background-color: #0E1117; } .stChatMessage[data-testid="user"] { background-color: #262730; } .stChatMessage[data-testid="assistant"] { background-color: transparent; } header {visibility: hidden;}</style>""", unsafe_allow_html=True)
+# Dark Minimal Styling
+st.markdown(
+    """
+    <style>
+    body { background-color: #0E1117 !important; }
+    .stMarkdown, .stChatMessage, .stTextInput, .stTextArea, .stButton, .stExpander {
+        color: #E0E0E0 !important;
+    }
+    .main { background-color: #0E1117 !important; }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
-# APIキー
-try:
-    API_KEY = st.secrets["GEMINI_API_KEY"]
-except:
-    st.error("🚨 API Key Error")
-    st.stop()
+st.title("🧠 Sci-Core AI — Disney Protocol Edition")
 
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+# -------------------------------
+#  セッション管理
+# -------------------------------
+if "history" not in st.session_state:
+    st.session_state.history = []
 
-# --- 【核心】ライブラリを使わず、直接URLを叩く関数 ---
-def call_api_direct(prompt, role):
-    # Googleの住所（エンドポイント）
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={API_KEY}"
-    
-    headers = {'Content-Type': 'application/json'}
-    
-    # 役割定義
-    sys_msg = "あなたは優秀なAIです。"
-    if role == "A": sys_msg = "あなたは肯定的なドリーマーです。"
-    elif role == "B": sys_msg = "あなたは批判的なリアリストです。"
-    elif role == "C": sys_msg = "あなたは統合する調整役です。"
 
-    # 手紙の中身（JSON）
-    data = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "systemInstruction": {"parts": [{"text": sys_msg}]}
+# -------------------------------
+#  Gemini REST API 呼び出し
+#  （google-generativeai は使用しない）
+# -------------------------------
+MODEL_NAME = "gemini-1.5-flash"
+
+def call_gemini_api(prompt: str):
+    api_key = st.secrets["GEMINI_API_KEY"]
+
+    url = (
+        f"https://generativelanguage.googleapis.com/v1beta/"
+        f"models/{MODEL_NAME}:generateContent?key={api_key}"
+    )
+
+    payload = {
+        "contents": [
+            {
+                "parts": [
+                    {"text": prompt}
+                ]
+            }
+        ]
     }
 
     try:
-        # 送信！
-        response = requests.post(url, headers=headers, json=data)
-        
-        if response.status_code == 200:
-            return response.json()['candidates'][0]['content']['parts'][0]['text']
-        else:
-            return f"Error {response.status_code}: {response.text}"
+        res = requests.post(url, json=payload, timeout=60)
+
+        # ❗ 要件どおり：エラー時は Raw Response をそのまま返す
+        if not res.ok:
+            return (
+                f"[ERROR]\n"
+                f"Status Code: {res.status_code}\n"
+                f"Raw Error:\n{res.text}"
+            )
+
+        data = res.json()
+        return data["candidates"][0]["content"]["parts"][0]["text"]
+
     except Exception as e:
-        return f"通信エラー: {e}"
+        return f"[EXCEPTION]\n{str(e)}"
 
-# 並列処理
-def run_parallel(prompt):
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        fa = executor.submit(call_api_direct, prompt, "A")
-        fb = executor.submit(call_api_direct, prompt, "B")
-        return fa.result(), fb.result()
 
-# UI
-with st.sidebar:
-    st.title("⚛️ Sci-Core")
-    st.caption("v6.0 Direct-REST")
-    if st.button("New Chat", use_container_width=True):
-        st.session_state.messages = []
-        st.rerun()
+# -------------------------------
+#  Disney Strategy — Prompt Templates
+# -------------------------------
+def build_prompt_dreamer(user_input):
+    return f"""
+You are Agent A — The Dreamer.
+Generate bold, innovative, optimistic ideas.
+Ignore constraints such as cost, time, and feasibility.
 
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
-        if "sub" in msg:
-            with st.expander("Thoughts"): st.markdown(msg["sub"])
+User Question:
+{user_input}
 
-prompt = st.chat_input("質問を入力...")
+Output Style:
+- visionary
+- creative
+- inspiring
+- no limitations
+"""
 
-if prompt:
-    with st.chat_message("user"): st.markdown(prompt)
-    st.session_state.messages.append({"role": "user", "content": prompt})
+def build_prompt_critic(user_input):
+    return f"""
+You are Agent B — The Realist / Critic.
+Analyze risks, constraints, feasibility, costs, and failures.
+Be strict, logical, and critical.
 
-    with st.chat_message("assistant"):
-        stat = st.status("Thinking...", expanded=True)
-        stat.write("⚡ Discussing...")
-        res_a, res_b = run_parallel(prompt)
-        
-        stat.write("👨‍⚖️ Synthesizing...")
-        final = call_api_direct(f"質問:{prompt}\nA:{res_a}\nB:{res_b}\n統合せよ", "C")
-        
-        stat.update(label="Complete", state="complete", expanded=False)
-        st.markdown(final)
-        
-        sub_log = f"**A:**\n{res_a}\n\n**B:**\n{res_b}"
-        with st.expander("Thoughts"): st.markdown(sub_log)
-        
-        st.session_state.messages.append({"role": "assistant", "content": final, "sub": sub_log})
+User Question:
+{user_input}
+
+Output Style:
+- risk assessment
+- weaknesses
+- constraints
+- potential failures
+"""
+
+def build_prompt_judge(user_input, a_out, b_out):
+    return f"""
+You are Agent C — The Judge / Synthesizer.
+
+Your task:
+Create a **third solution** which:
+- preserves the innovative strengths of Agent A
+- resolves the realistic concerns of Agent B
+- is practical, balanced, and elegant
+
+Context:
+
+[Agent A — Dreamer Output]
+{a_out}
+
+[Agent B — Realist Output]
+{b_out}
+
+User Question:
+{user_input}
+
+Output Style:
+- clear
+- structured
+- actionable
+- balanced innovation
+"""
+
+
+# -------------------------------
+#  UI — 履歴表示（既定は Agent C のみ）
+# -------------------------------
+for turn in st.session_state.history:
+    st.markdown("### ✨ 最終結論（Agent C）")
+    st.markdown(turn["agent_c"])
+
+    with st.expander("✨ 思考プロセスを表示 (Thoughts)"):
+        st.markdown("#### 🟦 Agent A — Dreamer")
+        st.markdown(turn["agent_a"])
+
+        st.markdown("#### 🟥 Agent B — Realist / Critic")
+        st.markdown(turn["agent_b"])
+
+    st.divider()
+
+
+# -------------------------------
+#  入力フォーム（画面下固定）
+# -------------------------------
+user_input = st.chat_input("質問・テーマを入力してください...")
+
+if user_input:
+
+    # Phase 1 — 並列思考（A & B を concurrent.futures で同時実行）
+    prompt_a = build_prompt_dreamer(user_input)
+    prompt_b = build_prompt_critic(user_input)
+
+    with st.spinner("Processing — Running parallel reasoning..."):
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            future_a = executor.submit(call_gemini_api, prompt_a)
+            future_b = executor.submit(call_gemini_api, prompt_b)
+
+            agent_a_out = future_a.result()
+            agent_b_out = future_b.result()
+
+    # Phase 2 — 統合（Agent C）
+    prompt_c = build_prompt_judge(user_input, agent_a_out, agent_b_out)
+    agent_c_out = call_gemini_api(prompt_c)
+
+    # セッション履歴へ保存
+    st.session_state.history.append(
+        {
+            "user": user_input,
+            "agent_a": agent_a_out,
+            "agent_b": agent_b_out,
+            "agent_c": agent_c_out,
+        }
+    )
+
+    # 直近の結果を即時表示
+    st.markdown("### ✨ 最終結論（Agent C）")
+    st.markdown(agent_c_out)
+
+    with st.expander("✨ 思考プロセスを表示 (Thoughts)"):
+        st.markdown("#### 🟦 Agent A — Dreamer")
+        st.markdown(agent_a_out)
+
+        st.markdown("#### 🟥 Agent B — Realist / Critic")
+        st.markdown(agent_b_out)
+
+    st.divider()
+
