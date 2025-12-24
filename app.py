@@ -15,7 +15,8 @@ st.markdown(
     """
     <style>
     body { background-color: #0E1117 !important; }
-    .stMarkdown, .stChatMessage, .stTextInput, .stTextArea, .stButton, .stExpander {
+    .stMarkdown, .stChatMessage, .stTextInput, .stTextArea,
+    .stButton, .stExpander {
         color: #E0E0E0 !important;
     }
     .main { background-color: #0E1117 !important; }
@@ -37,7 +38,7 @@ if "history" not in st.session_state:
 #  Gemini REST API 呼び出し
 #  （google-generativeai は使用しない）
 # -------------------------------
-MODEL_NAME = "gemini-1.5-flash"
+MODEL_NAME = "gemini-1.5-flash-latest"  # ← 修正版モデル名
 
 def call_gemini_api(prompt: str):
     api_key = st.secrets["GEMINI_API_KEY"]
