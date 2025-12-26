@@ -41,3 +41,14 @@ if st.button("送信"):
         except Exception as e:
             st.error("⚠️ API 実行中にエラーが発生しました")
             st.code(str(e))
+st.divider()
+st.subheader("🧾 利用可能なモデル一覧（デバッグ用）")
+
+if st.button("モデルを一覧表示する"):
+    try:
+        models = genai.list_models()
+        for m in models:
+            st.write(m.name)
+    except Exception as e:
+        st.error("モデル一覧の取得に失敗しました")
+        st.code(str(e))
