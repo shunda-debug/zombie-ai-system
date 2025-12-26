@@ -1,3 +1,4 @@
+st.warning(f"現在のモデル: {MODEL_NAME}")
 import streamlit as st
 import requests
 import concurrent.futures
