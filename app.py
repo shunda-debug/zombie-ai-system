@@ -1,54 +1,103 @@
 import streamlit as st
-from google import generativeai as genai
-import os
+import google.generativeai as genai
 
-# =============================
-# 🔑 Gemini API KEY の設定
-# =============================
-API_KEY = os.getenv("GEMINI_API_KEY")
+# ==============================
+#  設定
+# ==============================
 
-if not API_KEY:
-    st.error("❌ GEMINI_API_KEY が設定されていません（環境変数に追加してください）")
-    st.stop()
-
+API_KEY = st.secrets["GOOGLE_API_KEY"]
 genai.configure(api_key=API_KEY)
 
-# =============================
-# 🧠 使用するモデル名
-# =============================
-MODEL_NAME = "gemini-1.5-flash"
+MODEL_NAME = "models/gemini-2.5-flash"
 
-st.title("🧟‍♂️ Zombie-AI System（テスト版）")
+model = genai.GenerativeModel(MODEL_NAME)
+
+st.title("🧠 マルチエージェント AI システム")
+
 st.warning(f"現在のモデル: {MODEL_NAME}")
 
-# =============================
-# ✉️ 入力フォーム
-# =============================
-user_input = st.text_input("質問 or 指示を入力してください")
+# ==============================
+#  プロンプト入力
+# ==============================
 
-if st.button("送信"):
-    if not user_input:
-        st.warning("入力が空です")
-    else:
-        try:
-            model = genai.GenerativeModel(MODEL_NAME)
+user_input = st.text_area(
+    "質問 / 課題を入力してください",
+    height=150
+)
 
-            response = model.generate_content(user_input)
+run_button = st.button("🚀 実行")
 
-            st.subheader("🧠 AIの応答")
-            st.write(response.text)
 
-        except Exception as e:
-            st.error("⚠️ API 実行中にエラーが発生しました")
-            st.code(str(e))
-st.divider()
-st.subheader("🧾 利用可能なモデル一覧（デバッグ用）")
+# ==============================
+#  エージェント関数
+# ==============================
 
-if st.button("モデルを一覧表示する"):
+def run_agent(role_name, system_prompt, content):
+    st.subheader(role_name)
+
+    prompt = f"""
+あなたは {role_name} です。
+
+ルール:
+- 箇条書きで論理的に
+- 無駄な装飾はしない
+- 日本語で書く
+
+役割説明:
+{system_prompt}
+
+ユーザー入力:
+{content}
+"""
+
     try:
-        models = genai.list_models()
-        for m in models:
-            st.write(m.name)
+        response = model.generate_content(prompt)
+        output = response.text
+
     except Exception as e:
-        st.error("モデル一覧の取得に失敗しました")
-        st.code(str(e))
+        output = f"[ERROR] {str(e)}"
+
+    st.write(output)
+
+    return output
+
+
+# ==============================
+#  ボタン押下時の実行処理
+# ==============================
+
+if run_button and user_input.strip():
+
+    st.divider()
+    st.header("Agent A — Dreamer（発想担当）")
+
+    agent_a = run_agent(
+        "Agent A — Dreamer",
+        "自由発想で大胆なアイデアを出す役割。制約を考えすぎない。",
+        user_input
+    )
+
+    st.divider()
+    st.header("Agent B — Realist / Critic（批判担当）")
+
+    agent_b = run_agent(
+        "Agent B — Realist / Critic",
+        "現実的な観点から弱点・リスク・欠点を洗い出す役割。",
+        f"Agent A の案:\n{agent_a}"
+    )
+
+    st.divider()
+    st.header("Agent C — Synthesizer（統合担当）")
+
+    final_answer = run_agent(
+        "Agent C — Synthesizer",
+        """
+Agent A と Agent B の内容を整理し
+- 良い点を採用
+- 問題点を修正
+- 実行可能な結論をまとめる役割
+""",
+        f"Agent A:\n{agent_a}\n\nAgent B:\n{agent_b}"
+    )
+
+    st.success("🎉 処理完了！")
