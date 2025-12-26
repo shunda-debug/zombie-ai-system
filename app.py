@@ -1,4 +1,3 @@
-st.warning(f"現在のモデル: {MODEL_NAME}")
 import streamlit as st
 import requests
 import concurrent.futures
@@ -32,7 +31,7 @@ API_KEY = st.secrets["GEMINI_API_KEY"]
 
 BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 MODEL_NAME = "gemini-1.5-flash"   # ← 安定稼働版
-
+st.warning(f"現在のモデル: {MODEL_NAME}")
 HEADERS = {"Content-Type": "application/json"}
 
 
