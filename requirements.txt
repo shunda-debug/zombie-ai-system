@@ -1,2 +1,5 @@
 streamlit
 requests
+streamlit
+google-generativeai>=0.7.0
+
